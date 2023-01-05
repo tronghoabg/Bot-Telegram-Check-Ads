@@ -3,13 +3,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import requests
 import datetime
 import os
-from dotenv import load_dotenv
 
-load_dotenv('.env')
-token = os.getenv('COOKIES')
-print(token)
-
-ck = os.getenv('COOKIES')
+ck =  '1'
 
 headerscookie = {'cookie': ck}
 headers = {
@@ -173,8 +168,6 @@ async def share(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             print(i)
             res = SharePixel(listAcc[i], idpixel, token)
             await update.message.reply_text(res)
-
-
 
 
 
