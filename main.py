@@ -1,11 +1,12 @@
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import requests
 import datetime
 import os
 
-ck =  '1'
 
+ck =  '1'
 headerscookie = {'cookie': ck}
 headers = {
     'authority': 'm.facebook.com',
