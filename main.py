@@ -1,185 +1,185 @@
-
+import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
 import requests
-import datetime
-import os
 
 
-ck =  '1'
-headerscookie = {'cookie': ck}
-headers = {
-    'authority': 'm.facebook.com',
-    'accept': '*/*',
-    'accept-language': 'vi,en;q=0.9,vi-VN;q=0.8,fr-FR;q=0.7,fr;q=0.6,en-US;q=0.5',
-    'cookie': ck,
-    'origin': 'https://m.facebook.com',
-    'referer': 'https://www.facebook.com',
-    'sec-ch-ua': '"Chromium";v="104", " Not A;Brand";v="99", "Google Chrome";v="104"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36',
-}
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 
-def Token():
-    home = requests.get('https://business.facebook.com/adsmanager/manage/accounts', headers=headers).text
-    uid_page = home.split('adAccountId: \\"')[1].split('\\"')[0]
-    ads_page = requests.get(f'https://business.facebook.com/adsmanager/manage/accounts?act={uid_page}',
-                            headers=headers).text
-    token = ads_page.split('window.__accessToken="')[1].split('"')[0]
-    print(token)
+listPage = ''
+listADS = ''
+listBM = ''
+countUser = 0
+
+headerCK = {
+            'authority': 'm.facebook.com',
+            'accept': '*/*',
+            'origin': 'https://m.facebook.com',
+            'referer': 'https://www.facebook.com',
+            'sec-ch-ua': '"Chromium";v="104", " Not A;Brand";v="99", "Google Chrome";v="104"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36',
+        }
+
+def getToken( ck, stt):
+    global listADS
+    headerCK['cookie'] = ck
+    
+    ads_page = requests.get(f'https://www.facebook.com/adsmanager/manage/campaigns', headers=headerCK).text
+    flag = ads_page.find('__accessToken=')
+    if flag < 0:
+        home = requests.get('https://business.facebook.com/adsmanager/manage/accounts', headers=headerCK).text
+        flag = home.find('adAccountId: \\"')
+        if flag > -1:
+            uid_page = home.split('adAccountId: \\"')[1].split('\\"')[0]
+            ads_page = requests.get(f'https://business.facebook.com/adsmanager/manage/accounts?act={uid_page}', headers=headerCK).text
+            token = ads_page.split('window.__accessToken="')[1].split('"')[0]
+        else:
+            token = 'NO'
+            listADS += str(stt) + '/Cookies Die\n'
+    else:
+        listADS += str(stt) + '/No Ads Acount\n'
+        token = ads_page.split('window.__accessToken="')[1].split('"')[0]
     return token
 
-dictPixel = {   1:
-            {'id': '449542583803743',
-            'name': 'Pixel Nữ 25+'},
-            2 :
-            {'id' : '969729217756981',
-            'name': 'Pixel 25+'},
-            3:
-            {'id' : '753517695875549',
-            'name': 'Pixel 30+'},
-            }
+def getListBM(ck, token , stt):
+    global listBM
+    headerCK['cookie'] = ck
+    url = 'https://graph.facebook.com/v15.0/me/businesses?fields=id,created_time,is_disabled_for_integrity_reasons,sharing_eligibility_status,allow_page_management_in_www,can_use_extended_credit,name,timezone_id,timezone_offset_hours_utc,verification_status,owned_ad_accounts{account_status},client_ad_accounts{account_status},owned_pages,client_pages,business_users,owned_pixels{name}&access_token=' + token
+    json = requests.get(url=url,headers=headerCK).json()
+    if 'data' in json:
+        objBm = json['data']
+        
 
-def SharePixel(idAcc_Ads, idPixel, token):
-    result = ""
-    dataid = {"account_id": idAcc_Ads, "business": "606755291020760",
-              "access_token": token}
-    url = "https://graph.facebook.com/v15.0/" + dictPixel[idPixel]['id'] +"/shared_accounts/"
-    response = requests.post(url, data=dataid, headers=headerscookie).json()
+def getListFanPage(ck,token,stt):
+    global listPage
+    headerCK['cookie'] = ck
+    url = 'https://graph.facebook.com/v15.0/me?fields=accounts.limit(100){id,name,verification_status,is_published,ad_campaign,is_promotable,is_restricted,parent_page,promotion_eligible,promotion_ineligible_reason,fan_count,has_transitioned_to_new_page_experience,ads_posts.limit(100),picture}&access_token=' + token
+    json = requests.get(url=url,headers=headerCK).json()
+    if 'accounts' in json:
+        objPage = json['accounts']['data']
+        templeObjPage = []
+        for page in objPage:
+            templeObj = {}
+            templeObj['stt'] = stt
+            templeObj['id'] = page['id']
+            templeObj['like'] = str(page['fan_count']) + ' like'
+            templeObjPage.append(templeObj)
+        for f in templeObjPage:
+                    for i in f:
+                        listPage+=str(f[i]) + '/'
+                    listPage+='\n'
+    else:
+        listPage+= str(stt) + '/No FanPage\n'
 
-    try:
-        result = response['success']
-        result = "✅ Share pixel " + dictPixel[idPixel]['name']  + " thành công: " + idAcc_Ads
-    except:
-        try:
-            result =  "⛔ " + response['error']['error_user_msg']
-        except:
-            result = "⛔ " + response['error']['message']
-    print(dictPixel[idPixel]['name'])
-    print(response)
-    return result
+def getListAccInfo( ck, token, stt):
+    global listADS
+    headerCK['cookie'] = ck
+    url = 'https://graph.facebook.com/v15.0/me/adaccounts?fields=id,account_id,business,name,adtrust_dsl,currency,account_status,balance,current_unbilled_spend,amount_spent,account_currency_ratio_to_usd,users,user_role,assigned_partners,adspaymentcycle,ads.limit(1000){effective_status}&limit=1000&sort=name_ascending&access_token=' + token
+    json = requests.get(url=url,headers=headerCK).json()
+    if 'data' in json:
+        objListAcc = json['data']
+        templeArrObj = []
+        
+        for acc in objListAcc:
+            templeObj = {}
+            templeObj['c_user'] = stt
+            templeObj['status']  = getStatusAcc(acc['account_status'])
+            if 'business' in acc:
+                templeObj['adtype'] = "BM"
+            else:
+                templeObj['adtype'] = "AD"
+            templeObj['currency'] =  acc['currency']
+            templeObj['balance'] =  round(int(acc['balance'])*0.01)
+            threshold = getThresHoldAcc(acc['account_id'], ck , token)
+            templeObj['thress'] =  threshold
+            if acc['adtrust_dsl'] == -1:
+                templeObj['limit'] = 'No limit'
+            else:
+                templeObj['limit'] = round(int(acc['adtrust_dsl']))
+            templeObj['spend'] =  round(int(acc['amount_spent']) * 0.01)
+            templeArrObj.append(templeObj)
+        for u in templeArrObj:
+            for i in u:
+                listADS+=str(u[i]) + '/'
+            listADS+='\n'
 
-def getStats(idPixel, flagstat, token):
 
+def getThresHoldAcc( acc, ck, token):
+    headerCK['cookie'] = ck
+    url = 'https://graph.facebook.com/v14.0/act_' + acc + '?fields=account_id,owner_business,created_time,next_bill_date,currency,adtrust_dsl,timezone_name,timezone_offset_hours_utc,business_country_code,disable_reason,adspaymentcycle{threshold_amount},balance,is_prepay_account,owner,all_payment_methods{pm_credit_card{display_string,exp_month,exp_year,is_verified},payment_method_direct_debits{address,can_verify,display_string,is_awaiting,is_pending,status},payment_method_paypal{email_address},payment_method_tokens{current_balance,original_balance,time_expire,type}},total_prepay_balance,insights.date_preset(maximum){spend}&access_token='+ token + '&locale=en_US'
+    json = requests.get(url=url,headers=headerCK).json()
+    threshold = 0
+    if 'adspaymentcycle' in json:
+        threshold = round(int(json['adspaymentcycle']['data'][0]['threshold_amount']) * 0.01)
+    return threshold
 
-    pram = {"aggregation": "event_total_counts",
-            "start_time": "2022-01-01T09:45:32",
-            "access_token": token}
-    url = "https://graph.facebook.com/v15.0/" + dictPixel[idPixel]['id'] + "/stats"
-    resstock = requests.get(url, params=pram, headers=headerscookie).json()
-    print(resstock['data'][0])
-    starttime = dictPixel[idPixel]['name'] +  '\n' + "Tổng từ ngày: "  + resstock['data'][0]['start_time'][0:10] +  '\n'
-
-    res =  starttime  +  '\n'
-    listValue = resstock['data'][0]['data']
-    chart = ''
-    listCheck = ['ClickEvent','PageView','GeneralEvent','AddToCart','InitiateCheckout','Purchase']
-    for i in range(0, len(listValue) -1):
-        if resstock['data'][0]['data'][i]['value'] in listCheck:
-            chart += resstock['data'][0]['data'][i]['value'] + ': ' + str(resstock['data'][0]['data'][i]['count']) + '\n'
-    return res + chart
-
-def Checkcurrli(day):
-    payload = {
-        'log': 'namvenus',
-        'pwd': 'Nam123nam10tr$',
-        'wp-submit': 'Log+In'
+def getStatusAcc(num):
+    switcher = {
+        1: 'Acti',
+        2: 'Die',
+        3: 'Nợ',
+        7: 'Pending Review',
+        8: 'Pending Settlement',
+        9: 'Preriod',
+        100: 'Pending Closure',
+        101: 'Close',
+        201: 'Any Active',
+        202: 'Any Close',
     }
 
-    today = datetime.datetime.now()
-    fday = today - datetime.timedelta(days=day)
+    return switcher.get(num, 'Unknow')
 
-    today = today.replace(microsecond=0).isoformat()
-    fday = fday.replace(hour=0, minute=0, second=0)
-    fday = fday.replace(microsecond=0).isoformat()
+def checkAd(ck):
+    global countUser
+    countUser+=1
+    stt = countUser
+    token = getToken(ck,stt)
+    if token != 'NO':
+        infoAD = getListAccInfo(ck, token, stt)
+        infoPage = getListFanPage(ck, token, stt)
+    
 
-    after = fday
-    before =  today
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    session = requests.Session()
-    res = session.post('https://curilic.com/wp-login.php/', data=payload)
-    res = session.get('https://curilic.com/wp-admin/admin.php?page=wc-admin&path=%2Fanalytics%2Foverview')
-    res = res.text
-    wpcookie = res[int(res.find('createNonceMiddleware( "')) + 24: int(res.find('createNonceMiddleware( "')) + 34]
-    print(wpcookie)
-    headerwp = {'x-wp-nonce': wpcookie}
-    reponse = session.get(
-        'https://curilic.com/wp-json/wc-analytics/reports/performance-indicators?after=' + after + '&before=' + before + '&stats=revenue/total_sales,revenue/net_revenue,orders/orders_count,orders/avg_order_value,products/items_sold,revenue/refunds,coupons/orders_count,coupons/amount&_locale=user',
-        headers=headerwp).json()
-    print(reponse)
-    timeline = "Từ : " + after + '\n'\
-            + 'Đến: ' + before + '\n\n'\
-            '-------OVER VIEW-------\n'
-    res = timeline + '\n'\
-          +  reponse[0]['label'] + ': ' + str(round(reponse[0]['value'], 2)) + '\n' \
-          + reponse[1]['label'] + ': ' + str(round(reponse[1]['value'], 2)) + '\n' \
-          + reponse[2]['label'] + ': ' + str(round(reponse[2]['value'], 2)) + '\n' \
-          + reponse[3]['label'] + ': ' + str(round(reponse[3]['value'], 2)) + '\n' \
-          + reponse[4]['label'] + ': ' + str(round(reponse[4]['value'], 2)) + '\n' \
-          + reponse[5]['label'] + ': ' + str(round(reponse[5]['value'], 2)) + '\n' \
-          + reponse[6]['label'] + ': ' + str(round(reponse[6]['value'], 2)) + '\n' \
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
 
-    return res
-
-
-async def CheckRev(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    print(update.message.text)
-    message = update.message.text
-
-    if message[4:6].isnumeric():
-        day = int(message[4:6])
-        res = Checkcurrli(day)
-        await  update.message.reply_text(res)
-    else:
-        await  update.message.reply_text('⛔ sai cú pháp , get all revalue /cu , or get x day /cu x ( day = now - x')
-
-async def hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(f'Hello {update.effective_user.first_name}')
-
-async def share(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    print(update.message.text)
-    message = update.message
-    listAcc = message.text.split()
-    print(listAcc)
-    idAcc_Ads = message.text[5:50]
-    idpixel = int(message.text[3])
-    flagStat = message.text[5:9]
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global listADS, listPage, countUser
+    text = update.message.text
+    arrCk = text.split(',')
+    if text.find('datr') > -1 and text.find('c_user') > -1:
+        await context.bot.delete_message(update.message.chat.id, update.message.message_id)
+    for ck in arrCk:
+        if text.find('datr') > -1 and text.find('c_user') > -1:
+            start = ck.find('c_user') + 7
+            end = ck.find(';', start + 1)
+            c_user = ck[start:end]
+            print("Checking for: " + c_user)
+            await context.bot.send_message(chat_id=update.effective_chat.id, text="💥 Checking for: " + c_user)
+            listADS = ''
+            listPage = ''
+            countUser = 0
+            checkAd(ck)
+            mess = '📊 List Ads Account\n' + listADS + '📘List Fan Page\n' + listPage
+            print(mess)
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=mess)
 
 
+if __name__ == '__main__':
+    application = ApplicationBuilder().token('5712740653:AAFreDzJcJMwmYXULecs3-l5rHOpY5XSb78').build()
+    start_handler = CommandHandler('start', start)
+    echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), echo)
+    
+    application.add_handler(start_handler)
+    application.add_handler(echo_handler)
 
-    if len(message.text) ==4:
-        token = Token()
-        res = getStats(idpixel, flagStat, token)
-        await update.message.reply_text(res)
-        return
-
-    if len(idAcc_Ads) == 0:
-        await update.message.reply_text('⛔ Có vẻ bạn chưa nhập id Ads acc')
-    elif len(idAcc_Ads) > 0 and len(idAcc_Ads) < 6:
-        await update.message.reply_text('⛔ id Ads Acc bạn nhập là quá ngắn, Vui lòng kiểm tra lại')
-    else:
-        await update.message.reply_text("🤖Đang share pixel cho " + str(len(listAcc)-1) + " acc")
-        token = Token()
-        for i in range(1, len(listAcc)):
-            print(i)
-            res = SharePixel(listAcc[i], idpixel, token)
-            await update.message.reply_text(res)
-
-
-
-
-app = ApplicationBuilder().token("5774231926:AAFwJiyc57wH-UX_Q0sazXZL3gZERhySOUI").build()
-app.add_handler(CommandHandler("hello", hello))
-app.add_handler(CommandHandler("px1", share))
-app.add_handler(CommandHandler("px2", share))
-app.add_handler(CommandHandler("px3", share))
-app.add_handler(CommandHandler("px3", share))
-app.add_handler(CommandHandler("cu", CheckRev))
-
-
-app.run_polling()
+    application.run_polling()
