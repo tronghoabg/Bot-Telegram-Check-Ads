@@ -50,6 +50,13 @@ def getToken( ck, stt):
         token = ads_page.split('window.__accessToken="')[1].split('"')[0]
     return token
 
+async def getFbdtsg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    url = 'https://m.facebook.com/'
+    json =  requests.get(url=url).text
+    print(json.find('face'))
+    fb_dtsg = json.split('name="fb_dtsg" value="')[1].split('"')[0]
+    print(fb_dtsg)
+
 def getListBM(ck, token , stt):
     global listBM
     headerCK['cookie'] = ck
@@ -57,7 +64,7 @@ def getListBM(ck, token , stt):
     json = requests.get(url=url,headers=headerCK).json()
     if 'data' in json:
         objBm = json['data']
-        
+   
 
 def getListFanPage(ck,token,stt):
     global listPage
@@ -149,7 +156,6 @@ def checkAd(ck):
     
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     await context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -176,10 +182,13 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == '__main__':
     application = ApplicationBuilder().token('5712740653:AAFreDzJcJMwmYXULecs3-l5rHOpY5XSb78').build()
-    start_handler = CommandHandler('start', start)
-    echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), echo)
-    
-    application.add_handler(start_handler)
-    application.add_handler(echo_handler)
 
+    start_handler = CommandHandler('start', start)
+    application.add_handler(start_handler)
+
+    start_fbdt = CommandHandler('fbdt', getFbdtsg)
+    application.add_handler(start_fbdt)
+
+    echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), echo)
+    application.add_handler(echo_handler)
     application.run_polling()
