@@ -4,11 +4,26 @@ from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHan
 import requests
 import time
 import threading
+from threading import Thread
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+
+class ThreadWithReturnValue(Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        Thread.__init__(self, group, target, name, args, kwargs)
+        self._return = None
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args,
+                                                **self._kwargs)
+    def join(self, *args):
+        Thread.join(self, *args)
+        return self._return
 
 headerCK = {
             'authority': 'm.facebook.com',
@@ -97,6 +112,7 @@ def getListGroup(ck, token):
             listGroups+='\n'
     if listGroups== '':
         listGroups+=str(stt) + '/No Groups\n'
+    print(listGroups)
     return listGroups
 
 
@@ -133,6 +149,7 @@ def getListBM(ck, token , fbdt):
             listBM+='\n'
     if listBM == '':
         listBM+= str(stt) + '/No BM\n'
+    print(listBM)
     return listBM
 def getBmlimit(ck, idBm, fbdt):
     headerCK['cookie'] = ck
@@ -168,6 +185,7 @@ def getListFanPage(ck,token):
                     listPage+='\n'
     else:
         listPage+= str(stt+1) + '/No FanPage\n'
+    print(listPage)
     return listPage
 
 def getListAccInfo(ck, token, fbdt):
@@ -181,7 +199,8 @@ def getListAccInfo(ck, token, fbdt):
     if 'data' in json:
         objListAcc = json['data']
         templeArrObj = []
-        
+        thread_threshold = []
+        thread_card = []
         for acc in objListAcc:
             stt+=1
             templeObj = {}
@@ -193,16 +212,27 @@ def getListAccInfo(ck, token, fbdt):
                 templeObj['adtype'] = "AD"
             templeObj['currency'] =  acc['currency']
             templeObj['balance'] =  round(int(acc['balance'])*0.01)
-            threshold = getThresHoldAcc(acc['account_id'], ck , token)
-            templeObj['thress'] =  threshold
+            acc_id = acc['account_id']
+            thread = ThreadWithReturnValue(target=getThresHoldAcc, args=(acc_id, ck, token))
+            thread_threshold.append(thread)
+            thread_threshold[stt-1].start()
+            templeObj['thress'] =  'thress'
             if acc['adtrust_dsl'] == -1:
                 templeObj['limit'] = 'No limit'
             else:
                 templeObj['limit'] = round(int(acc['adtrust_dsl']))
             templeObj['spend'] =  round(int(acc['amount_spent']) * 0.01)
-            card = getCard(ck, user_id, acc['account_id'], fbdt)
-            templeObj['card'] = card
+            thread = ThreadWithReturnValue(target=getCard, args=(ck, user_id, acc_id, fbdt))
+            thread_card.append(thread)
+            thread_card[stt-1].start()
+            templeObj['card'] = 'card'
             templeArrObj.append(templeObj)
+        stt=0
+        for obj in templeArrObj:
+            obj['thress'] = thread_threshold[stt].join()
+            obj['card'] = thread_card[stt].join()
+            stt+=1
+
         for u in templeArrObj:
             for i in u:
                 if i=='card' and u[i] != '':
@@ -211,6 +241,7 @@ def getListAccInfo(ck, token, fbdt):
                 else:
                     listADS+=str(u[i]) + '/'
             listADS+='\n'
+    print(listADS)
     return listADS
 
 def getCard(ck, user, act, fbdt):
@@ -277,27 +308,21 @@ def checkAd(ck):
     if token != 'NO':
         fbdt = getFbdt(ck)
 
-        #infoAD = threading.Thread(target=getListAccInfo, args=(ck, token, fbdt,))
-        #infoPage = threading.Thread(target=getListFanPage, args=(ck, token,))
-        #infoBM = threading.Thread(target=getListBM, args=(ck, token, fbdt,))
-        #infoGroups = threading.Thread(target=getListGroup, args=(ck, token,))
+        thread1 = ThreadWithReturnValue(target=getListAccInfo, args=(ck, token, fbdt,))
+        thread2 = ThreadWithReturnValue(target=getListFanPage, args=(ck, token,))
+        thread3 = ThreadWithReturnValue(target=getListBM, args=(ck, token, fbdt,))
+        thread4 = ThreadWithReturnValue(target=getListGroup, args=(ck, token,))
 
-        #infoAD.start()
-        #infoPage.start()
-        #infoBM.start()
-        #infoGroups.start()
+        thread1.start()
+        thread2.start()
+        thread3.start()
+        thread4.start()
 
-        #infoAD.join()
-        #infoPage.join()
-        #infoBM.join()
-        #infoGroups.join()
+        infoAD = thread1.join()
+        infoPage = thread2.join()
+        infoBM = thread3.join()
+        infoGroups = thread4.join()
         
-        infoAD = getListAccInfo(ck, token, fbdt)
-        infoPage = getListFanPage(ck, token)
-        infoBM = getListBM(ck, token, fbdt)
-        infoGroups = getListGroup(ck, token)
-
-
         caption =   '✅ List ADS\n'\
                     +infoAD +'\n'\
                     +'✅ List FanPage\n'\
